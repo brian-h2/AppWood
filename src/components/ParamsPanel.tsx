@@ -27,9 +27,9 @@ const Field = ({
   onChange: (v: number) => void;
 }) => (
   <div className="space-y-2">
-    <div className="flex items-baseline justify-between">
+    <div className="flex items-baseline justify-between gap-2">
       <Label className="text-sm font-medium text-foreground">{label}</Label>
-      <div className="flex items-center gap-1.5">
+      <div className="flex shrink-0 items-center gap-1.5">
         <Input
           type="number"
           value={value}
@@ -37,7 +37,7 @@ const Field = ({
           max={max}
           step={step}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="h-7 w-20 font-mono text-right text-sm"
+          className="h-7 w-16 font-mono text-right text-sm sm:w-20"
         />
         <span className="text-xs text-muted-foreground">{unit}</span>
       </div>

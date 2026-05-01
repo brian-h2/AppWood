@@ -27,6 +27,8 @@ interface FurnitureStoreState {
   setDimensions: (dims: TemplateDimensions) => void;
   setMaterial: (material: MaterialType) => void;
   clearTemplate: () => void;
+  addBlock: (block: BuildingBlock) => void;
+  removeBlock: (blockId: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -107,5 +109,15 @@ export const useFurnitureStore = create<FurnitureStoreState>()((set, get) => ({
       validationErrors: false,
       dimensions: INITIAL_DIMENSIONS,
     });
+  },
+
+  // --- addBlock: append a manually-created block ---
+  addBlock: (block: BuildingBlock) => {
+    set((state) => ({ blocks: [...state.blocks, block] }));
+  },
+
+  // --- removeBlock: remove a block by id ---
+  removeBlock: (blockId: string) => {
+    set((state) => ({ blocks: state.blocks.filter((b) => b.id !== blockId) }));
   },
 }));

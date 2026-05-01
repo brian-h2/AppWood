@@ -17,7 +17,8 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import * as THREE from "three";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows, Grid } from "@react-three/drei";
-import type { FurnitureModel } from "@/lib/types";
+import type { FurnitureModel, BuildingBlock } from "@/lib/types";
+import { VALIDATION_COLORS } from "@/lib/types";
 import { createHitTestService } from "@/lib/ar/hitTestService";
 import type { HitTestService } from "@/lib/ar/hitTestService";
 
@@ -105,12 +106,30 @@ function createReticleMesh(): THREE.Mesh {
 
 // ---------------------------------------------------------------------------
 // Fallback 3D view (when AR is not supported)
+// Renders the actual furniture model: blocks in blocks mode, parametric box otherwise.
 // ---------------------------------------------------------------------------
+
+function BlockMeshFallback({ block }: { block: BuildingBlock }) {
+  const MM = 0.001;
+  const color = VALIDATION_COLORS[block.visualValidationStatus] ?? "#c8a96e";
+  return (
+    <mesh
+      position={[block.position.x * MM, block.position.y * MM, block.position.z * MM]}
+      rotation={[block.rotation.x, block.rotation.y, block.rotation.z]}
+      castShadow
+      receiveShadow
+    >
+      <boxGeometry args={[block.size.x * MM, block.size.y * MM, block.size.z * MM]} />
+      <meshStandardMaterial color={color ?? "#c8a96e"} roughness={0.65} metalness={0.05} />
+    </mesh>
+  );
+}
 
 function FallbackViewer3D({ model }: { model: FurnitureModel }) {
   const dims = getFurnitureDimensions(model);
   const MM = 0.001;
   const yOffset = (dims.h / 2) * MM;
+  const hasBlocks = model.designMode === "blocks" && model.blocks.length > 0;
 
   return (
     <Canvas
@@ -121,10 +140,18 @@ function FallbackViewer3D({ model }: { model: FurnitureModel }) {
       <color attach="background" args={["#efe7da"]} />
       <ambientLight intensity={0.45} />
       <directionalLight position={[4, 6, 3]} intensity={1.1} castShadow />
-      <mesh position={[0, yOffset, 0]} castShadow receiveShadow>
-        <boxGeometry args={[dims.w * MM, dims.h * MM, dims.d * MM]} />
-        <meshStandardMaterial color={0xc8a96e} roughness={0.65} metalness={0.05} />
-      </mesh>
+      {hasBlocks ? (
+        <group>
+          {model.blocks.map((b) => (
+            <BlockMeshFallback key={b.id} block={b} />
+          ))}
+        </group>
+      ) : (
+        <mesh position={[0, yOffset, 0]} castShadow receiveShadow>
+          <boxGeometry args={[dims.w * MM, dims.h * MM, dims.d * MM]} />
+          <meshStandardMaterial color={0xc8a96e} roughness={0.65} metalness={0.05} />
+        </mesh>
+      )}
       <ContactShadows position={[0, 0, 0]} opacity={0.45} scale={8} blur={2.4} far={4} />
       <Grid
         position={[0, 0.001, 0]}
@@ -140,7 +167,13 @@ function FallbackViewer3D({ model }: { model: FurnitureModel }) {
         infiniteGrid
       />
       <Environment preset="apartment" />
-      <OrbitControls target={[0, yOffset, 0]} enableDamping minDistance={1.2} maxDistance={8} maxPolarAngle={Math.PI / 2.05} />
+      <OrbitControls
+        target={[0, hasBlocks ? 0 : yOffset, 0]}
+        enableDamping
+        minDistance={1.2}
+        maxDistance={8}
+        maxPolarAngle={Math.PI / 2.05}
+      />
     </Canvas>
   );
 }
@@ -645,59 +678,63 @@ export function ARViewer({ furnitureModel, onExit }: ARViewerProps) {
   // --- Task 12.1: Support status messages ---
   if (supportStatus === "no-webxr") {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-6 text-center">
-        <p className="text-amber-700 font-medium">
-          Navegador no soporta WebXR AR. Usa Chrome para Android o Safari iOS 16+.
-        </p>
-        <div className="w-full h-64">
+      <div className="relative flex flex-col h-full">
+        <div className="flex-1">
           <FallbackViewer3D model={furnitureModel} />
         </div>
-        <button
-          onClick={onExit}
-          className="px-4 py-2 bg-gray-200 rounded-lg text-sm"
-        >
-          Volver al diseñador
-        </button>
+        <div className="absolute bottom-8 left-0 right-0 flex flex-col items-center gap-3 px-4">
+          <div className="bg-black/60 text-amber-300 px-4 py-2 rounded-lg text-sm font-medium text-center">
+            AR no disponible en este navegador. Usa Chrome para Android o Safari iOS 16+.
+          </div>
+          <button
+            onClick={onExit}
+            className="px-4 py-2 bg-gray-200 rounded-lg text-sm"
+          >
+            Volver al diseñador
+          </button>
+        </div>
       </div>
     );
   }
 
   if (supportStatus === "no-https") {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-6 text-center">
-        <p className="text-red-600 font-medium">
-          AR requiere conexión segura (HTTPS). Por favor, accede a la aplicación mediante HTTPS.
-        </p>
-        <div className="w-full h-64">
+      <div className="relative flex flex-col h-full">
+        <div className="flex-1">
           <FallbackViewer3D model={furnitureModel} />
         </div>
-        <button
-          onClick={onExit}
-          className="px-4 py-2 bg-gray-200 rounded-lg text-sm"
-        >
-          Volver al diseñador
-        </button>
+        <div className="absolute bottom-8 left-0 right-0 flex flex-col items-center gap-3 px-4">
+          <div className="bg-black/60 text-red-300 px-4 py-2 rounded-lg text-sm font-medium text-center">
+            AR requiere HTTPS. Accede a la app mediante una conexión segura.
+          </div>
+          <button
+            onClick={onExit}
+            className="px-4 py-2 bg-gray-200 rounded-lg text-sm"
+          >
+            Volver al diseñador
+          </button>
+        </div>
       </div>
     );
   }
 
   if (supportStatus === "desktop" || supportStatus === "unsupported") {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-6 text-center">
-        <p className="text-gray-600 font-medium">
-          {supportStatus === "desktop"
-            ? "Dispositivo no soporta AR inmersiva. Mostrando vista 3D estándar."
-            : "Dispositivo no soporta AR inmersiva. Mostrando vista 3D estándar."}
-        </p>
-        <div className="w-full flex-1 min-h-64">
+      <div className="relative flex flex-col h-full">
+        <div className="flex-1">
           <FallbackViewer3D model={furnitureModel} />
         </div>
-        <button
-          onClick={onExit}
-          className="px-4 py-2 bg-gray-200 rounded-lg text-sm"
-        >
-          Volver al diseñador
-        </button>
+        <div className="absolute bottom-8 left-0 right-0 flex flex-col items-center gap-3 px-4">
+          <div className="bg-black/60 text-white px-4 py-2 rounded-lg text-sm font-medium text-center">
+            Vista 3D — AR inmersiva disponible en dispositivos móviles compatibles.
+          </div>
+          <button
+            onClick={onExit}
+            className="px-4 py-2 bg-gray-200 rounded-lg text-sm"
+          >
+            Volver al diseñador
+          </button>
+        </div>
       </div>
     );
   }
@@ -705,41 +742,50 @@ export function ARViewer({ furnitureModel, onExit }: ARViewerProps) {
   // Session error state
   if (sessionStatus === "error" && sessionError) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-6 text-center">
-        <p className="text-red-600 font-medium">{sessionError}</p>
-        <div className="w-full flex-1 min-h-64">
+      <div className="relative flex flex-col h-full">
+        <div className="flex-1">
           <FallbackViewer3D model={furnitureModel} />
         </div>
-        <button
-          onClick={() => { setSessionStatus("idle"); setSessionError(null); }}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm"
-        >
-          Intentar de nuevo
-        </button>
-        <button
-          onClick={onExit}
-          className="px-4 py-2 bg-gray-200 rounded-lg text-sm"
-        >
-          Volver al diseñador
-        </button>
+        <div className="absolute bottom-8 left-0 right-0 flex flex-col items-center gap-3 px-4">
+          <div className="bg-black/60 text-red-300 px-4 py-2 rounded-lg text-sm font-medium text-center">
+            {sessionError}
+          </div>
+          <button
+            onClick={() => { setSessionStatus("idle"); setSessionError(null); }}
+            className="px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold text-base shadow-lg"
+            style={{ minWidth: 200, minHeight: 48 }}
+          >
+            Intentar de nuevo
+          </button>
+          <button
+            onClick={onExit}
+            className="px-4 py-2 bg-gray-200 rounded-lg text-sm"
+          >
+            Volver al diseñador
+          </button>
+        </div>
       </div>
     );
   }
 
-  // Checking state  show loading indicator without blocking UI (requirement 1.5)
+  // Checking state — show loading indicator without blocking UI (requirement 1.5)
   if (supportStatus === "checking") {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-6 text-center">
-        <p className="text-gray-500 text-sm">Comprobando soporte AR...</p>
-        <div className="w-full flex-1 min-h-64">
+      <div className="relative flex flex-col h-full">
+        <div className="flex-1">
           <FallbackViewer3D model={furnitureModel} />
         </div>
-        <button
-          onClick={onExit}
-          className="px-4 py-2 bg-gray-200 rounded-lg text-sm"
-        >
-          Volver al diseñador
-        </button>
+        <div className="absolute bottom-8 left-0 right-0 flex flex-col items-center gap-3 px-4">
+          <div className="bg-black/60 text-white px-4 py-2 rounded-lg text-sm text-center">
+            Comprobando soporte AR…
+          </div>
+          <button
+            onClick={onExit}
+            className="px-4 py-2 bg-gray-200 rounded-lg text-sm"
+          >
+            Volver al diseñador
+          </button>
+        </div>
       </div>
     );
   }

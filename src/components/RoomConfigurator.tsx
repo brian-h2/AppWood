@@ -524,7 +524,7 @@ export function RoomConfigurator({ furnitureModel, onConfigChange }: RoomConfigu
   return (
     <div className="flex flex-col gap-6">
       {/* Dimension inputs */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
         <DimensionField
           id="room-length"
           label="Largo"
@@ -614,7 +614,7 @@ export function RoomConfigurator({ furnitureModel, onConfigChange }: RoomConfigu
 
           <CollapsibleContent className="mt-3">
             <div className="rounded-lg border border-border bg-muted/30 p-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {/* Type */}
                 <div className="flex flex-col gap-1">
                   <Label htmlFor="obs-type" className="text-sm font-medium">
@@ -770,7 +770,7 @@ export function RoomConfigurator({ furnitureModel, onConfigChange }: RoomConfigu
         )}
 
         {/* Export / Import */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={handleExport}>
             Exportar configuración
           </Button>

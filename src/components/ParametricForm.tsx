@@ -68,10 +68,10 @@ export function ParametricForm({ onDimensionsChange }: ParametricFormProps): JSX
       )}
 
       {/* Task 7.1 — Dimension inputs */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         {(['W', 'H', 'D'] as const).map((dim) => (
           <div key={dim}>
-            <Label htmlFor={`dim-${dim}`}>{dim} (mm)</Label>
+            <Label htmlFor={`dim-${dim}`} className="text-xs sm:text-sm">{dim} (mm)</Label>
             <Input
               id={`dim-${dim}`}
               type="number"
@@ -82,6 +82,7 @@ export function ParametricForm({ onDimensionsChange }: ParametricFormProps): JSX
               onChange={(e) =>
                 setLocalDims((prev) => ({ ...prev, [dim]: Number(e.target.value) }))
               }
+              className="h-9 text-sm"
             />
           </div>
         ))}

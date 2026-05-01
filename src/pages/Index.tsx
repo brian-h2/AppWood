@@ -27,6 +27,7 @@ import {
 import { Hammer, Box, Layers, Home, Camera } from "lucide-react";
 import { TemplateGallery } from "@/components/TemplateGallery";
 import { ParametricForm } from "@/components/ParametricForm";
+import { CustomPieceForm } from "@/components/CustomPieceForm";
 import { useFurnitureStore } from "@/lib/store/furnitureStore";
 
 // ---------------------------------------------------------------------------
@@ -164,16 +165,16 @@ const Index = () => {
       {/* Header                                                               */}
       {/* ------------------------------------------------------------------ */}
       <header className="border-b border-border/60 bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-gradient-accent shadow-soft">
-              <Hammer className="h-5 w-5 text-primary" />
+        <div className="mx-auto flex h-14 max-w-[1600px] items-center justify-between px-4 sm:h-16 sm:px-6">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-accent shadow-soft sm:h-9 sm:w-9">
+              <Hammer className="h-4 w-4 text-primary sm:h-5 sm:w-5" />
             </div>
             <div>
-              <h1 className="font-display text-lg font-extrabold leading-none tracking-tight">
+              <h1 className="font-display text-base font-extrabold leading-none tracking-tight sm:text-lg">
                 Maderas<span className="text-accent">Caroya</span>
               </h1>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="hidden text-[11px] text-muted-foreground sm:block">
                 Diseño paramétrico 3D para carpintería
               </p>
             </div>
@@ -189,8 +190,8 @@ const Index = () => {
       {/* Top-level tab bar                                                    */}
       {/* ------------------------------------------------------------------ */}
       <div className="border-b border-border/60 bg-background/60 backdrop-blur-sm">
-        <div className="mx-auto max-w-[1600px] px-6">
-          <nav className="flex gap-1 py-2" role="tablist" aria-label="Secciones principales">
+        <div className="mx-auto max-w-[1600px] px-3 sm:px-6">
+          <nav className="flex gap-0.5 py-1.5 sm:gap-1 sm:py-2" role="tablist" aria-label="Secciones principales">
             {(
               [
                 { id: "designer", label: "Diseñador", icon: Layers },
@@ -204,14 +205,15 @@ const Index = () => {
                 aria-selected={activeTab === id}
                 onClick={() => setActiveTab(id)}
                 className={[
-                  "flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors",
+                  "flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors sm:gap-2 sm:px-4 sm:text-sm",
                   activeTab === id
                     ? "bg-primary text-primary-foreground shadow-soft"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 ].join(" ")}
               >
-                <Icon className="h-4 w-4" />
-                {label}
+                <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="hidden xs:inline sm:inline">{label}</span>
+                <span className="xs:hidden sm:hidden">{label}</span>
               </button>
             ))}
           </nav>
@@ -222,17 +224,55 @@ const Index = () => {
       {/* TAB: Diseñador                                                       */}
       {/* ================================================================== */}
       {activeTab === "designer" && (
-        <main className="mx-auto grid max-w-[1600px] gap-4 p-4 lg:grid-cols-[320px_1fr_380px]">
-          {/* ---- Sidebar params ---- */}
-          <aside className="rounded-xl border border-border bg-card p-5 shadow-soft">
+        <main className="mx-auto max-w-[1600px] gap-4 p-3 sm:p-4 lg:grid lg:grid-cols-[320px_1fr_380px]">
+          {/* ---- Viewer (mobile: first, desktop: middle column) ---- */}
+          <section className="relative h-[55vw] min-h-[260px] overflow-hidden rounded-xl border border-border bg-card shadow-elegant lg:order-2 lg:h-auto lg:min-h-[640px]">
+            {furnitureModel.designMode === "parametric" ? (
+              <>
+                <Suspense
+                  fallback={
+                    <div className="flex h-full items-center justify-center text-muted-foreground">
+                      Cargando visor 3D…
+                    </div>
+                  }
+                >
+                  <Viewer3D pieces={pieces} height={furnitureModel.params.height} />
+                </Suspense>
+                <div className="pointer-events-none absolute left-3 top-3 rounded-md bg-background/85 px-2.5 py-1.5 text-[11px] font-mono text-muted-foreground shadow-soft backdrop-blur sm:left-4 sm:top-4 sm:px-3 sm:text-xs">
+                  {furnitureModel.params.width} × {furnitureModel.params.height} ×{" "}
+                  {furnitureModel.params.depth} mm
+                </div>
+                <div className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-background/85 px-2.5 py-1.5 text-[10px] text-muted-foreground shadow-soft backdrop-blur sm:bottom-4 sm:right-4 sm:text-[11px]">
+                  Arrastra para rotar · Scroll para zoom
+                </div>
+              </>
+            ) : (
+              <Suspense
+                fallback={
+                  <div className="flex h-full items-center justify-center text-muted-foreground">
+                    Cargando visor 3D…
+                  </div>
+                }
+              >
+                <Viewer3D
+                  pieces={[]}
+                  height={0}
+                  blocks={furnitureModel.blocks}
+                />
+              </Suspense>
+            )}
+          </section>
+
+          {/* ---- Sidebar params (mobile: second, desktop: left column) ---- */}
+          <aside className="overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-soft sm:p-5 lg:order-1 lg:max-h-none">
             {/* Mode toggle */}
-            <div className="mb-5">
+            <div className="mb-4 sm:mb-5">
               <h2 className="font-display text-base font-bold">Modo de diseño</h2>
-              <div className="mt-2 flex rounded-lg border border-border overflow-hidden">
+              <div className="mt-2 flex overflow-hidden rounded-lg border border-border">
                 <button
                   onClick={() => handleDesignModeChange("parametric")}
                   className={[
-                    "flex-1 py-1.5 text-xs font-medium transition-colors",
+                    "flex-1 py-2 text-xs font-medium transition-colors sm:py-1.5",
                     furnitureModel.designMode === "parametric"
                       ? "bg-primary text-primary-foreground"
                       : "bg-card text-muted-foreground hover:bg-muted",
@@ -243,7 +283,7 @@ const Index = () => {
                 <button
                   onClick={() => handleDesignModeChange("blocks")}
                   className={[
-                    "flex-1 py-1.5 text-xs font-medium transition-colors",
+                    "flex-1 py-2 text-xs font-medium transition-colors sm:py-1.5",
                     furnitureModel.designMode === "blocks"
                       ? "bg-primary text-primary-foreground"
                       : "bg-card text-muted-foreground hover:bg-muted",
@@ -255,7 +295,7 @@ const Index = () => {
             </div>
 
             {/* Material selector */}
-            <div className="mb-5">
+            <div className="mb-4 sm:mb-5">
               <label className="mb-1.5 block text-sm font-medium" htmlFor="material-select">
                 Material
               </label>
@@ -279,7 +319,7 @@ const Index = () => {
             {/* Parametric params */}
             {furnitureModel.designMode === "parametric" && (
               <>
-                <div className="mb-5">
+                <div className="mb-4 sm:mb-5">
                   <h2 className="font-display text-base font-bold">Parámetros</h2>
                   <p className="text-xs text-muted-foreground">
                     Ajusta y mira el cambio en tiempo real.
@@ -297,53 +337,16 @@ const Index = () => {
                   <TemplateGallery />
                 </div>
                 <ParametricForm />
+                <CustomPieceForm />
               </div>
             )}
           </aside>
 
-          {/* ---- Viewer ---- */}
-          <section className="relative h-[70vh] overflow-hidden rounded-xl border border-border bg-card shadow-elegant lg:h-auto lg:min-h-[640px]">
-            {furnitureModel.designMode === "parametric" ? (
-              <>
-                <Suspense
-                  fallback={
-                    <div className="flex h-full items-center justify-center text-muted-foreground">
-                      Cargando visor 3D…
-                    </div>
-                  }
-                >
-                  <Viewer3D pieces={pieces} height={furnitureModel.params.height} />
-                </Suspense>
-                <div className="pointer-events-none absolute left-4 top-4 rounded-md bg-background/85 px-3 py-1.5 text-xs font-mono text-muted-foreground shadow-soft backdrop-blur">
-                  {furnitureModel.params.width} × {furnitureModel.params.height} ×{" "}
-                  {furnitureModel.params.depth} mm
-                </div>
-                <div className="pointer-events-none absolute bottom-4 right-4 rounded-md bg-background/85 px-3 py-1.5 text-[11px] text-muted-foreground shadow-soft backdrop-blur">
-                  Arrastra para rotar · Scroll para zoom
-                </div>
-              </>
-            ) : (
-              <Suspense
-                fallback={
-                  <div className="flex h-full items-center justify-center text-muted-foreground">
-                    Cargando visor 3D…
-                  </div>
-                }
-              >
-                <Viewer3D
-                  pieces={[]}
-                  height={0}
-                  blocks={furnitureModel.blocks}
-                />
-              </Suspense>
-            )}
-          </section>
-
-          {/* ---- Right panel: cut list / nesting ---- */}
-          <aside className="rounded-xl border border-border bg-card p-5 shadow-soft">
+          {/* ---- Right panel: cut list / nesting (mobile: third, desktop: right column) ---- */}
+          <aside className="rounded-xl border border-border bg-card p-4 shadow-soft sm:p-5 lg:order-3">
             <Tabs defaultValue="list" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="list">Lista</TabsTrigger>
+                <TabsTrigger value="list">Lista de corte</TabsTrigger>
                 <TabsTrigger value="nest">Optimización</TabsTrigger>
               </TabsList>
               <TabsContent value="list" className="mt-4">
@@ -381,9 +384,9 @@ const Index = () => {
       {/* TAB: Entornos                                                        */}
       {/* ================================================================== */}
       {activeTab === "environments" && (
-        <main className="mx-auto max-w-[1600px] gap-6 p-4 lg:grid lg:grid-cols-[1fr_480px]">
+        <main className="mx-auto max-w-[1600px] gap-4 p-3 sm:gap-6 sm:p-4 lg:grid lg:grid-cols-[1fr_480px]">
           {/* ---- Scene Presets ---- */}
-          <section className="rounded-xl border border-border bg-card p-6 shadow-soft">
+          <section className="rounded-xl border border-border bg-card p-4 shadow-soft sm:p-6">
             <div className="mb-4">
               <h2 className="font-display text-base font-bold">Entornos de escena</h2>
               <p className="text-xs text-muted-foreground">
@@ -410,7 +413,7 @@ const Index = () => {
             )}
 
             {/* 3D preview of the furniture in the selected preset */}
-            <div className="relative mt-4 h-64 overflow-hidden rounded-xl border border-border bg-card shadow-elegant lg:h-80">
+            <div className="relative mt-4 h-56 overflow-hidden rounded-xl border border-border bg-card shadow-elegant sm:h-64 lg:h-80">
               <Suspense
                 fallback={
                   <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
@@ -429,7 +432,7 @@ const Index = () => {
           </section>
 
           {/* ---- Room Configurator ---- */}
-          <section className="rounded-xl border border-border bg-card p-6 shadow-soft">
+          <section className="mt-4 rounded-xl border border-border bg-card p-4 shadow-soft sm:p-6 lg:mt-0">
             <div className="mb-4">
               <h2 className="font-display text-base font-bold">Configurador de habitación</h2>
               <p className="text-xs text-muted-foreground">
@@ -454,8 +457,8 @@ const Index = () => {
       {/* TAB: AR                                                              */}
       {/* ================================================================== */}
       {activeTab === "ar" && (
-        <main className="mx-auto max-w-[1600px] p-4">
-          <div className="h-[calc(100vh-10rem)] overflow-hidden rounded-xl border border-border bg-card shadow-elegant">
+        <main className="mx-auto max-w-[1600px] p-0 sm:p-4">
+          <div className="h-[calc(100vh-7rem)] overflow-hidden sm:h-[calc(100vh-10rem)] sm:rounded-xl sm:border sm:border-border sm:bg-card sm:shadow-elegant">
             <ARViewer
               furnitureModel={furnitureModel}
               onExit={() => setActiveTab("designer")}
@@ -467,7 +470,7 @@ const Index = () => {
       {/* ------------------------------------------------------------------ */}
       {/* Footer                                                               */}
       {/* ------------------------------------------------------------------ */}
-      <footer className="mx-auto max-w-[1600px] px-6 py-6 text-center text-xs text-muted-foreground">
+      <footer className="mx-auto max-w-[1600px] px-4 py-4 text-center text-xs text-muted-foreground sm:px-6 sm:py-6">
         DoselCode Wood · Plataforma de diseño de muebles — piezas en mm, tolerancia de sierra{" "}
         {nestingConfig.sawKerfMm} mm.
       </footer>

@@ -42,8 +42,8 @@ export function CutList({ items }: { items: CutItem[] }) {
         </Button>
       </div>
 
-      <div className="overflow-hidden rounded-md border border-border bg-card">
-        <Table>
+      <div className="overflow-x-auto rounded-md border border-border bg-card">
+        <Table className="min-w-[320px]">
           <TableHeader>
             <TableRow className="bg-secondary/50 hover:bg-secondary/50">
               <TableHead>Pieza</TableHead>
