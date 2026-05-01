@@ -28,6 +28,7 @@ import { Hammer, Box, Layers, Home, Camera } from "lucide-react";
 import { TemplateGallery } from "@/components/TemplateGallery";
 import { ParametricForm } from "@/components/ParametricForm";
 import { CustomPieceForm } from "@/components/CustomPieceForm";
+import { FinishSelector } from "@/components/FinishSelector";
 import { useFurnitureStore } from "@/lib/store/furnitureStore";
 
 // ---------------------------------------------------------------------------
@@ -105,6 +106,7 @@ const Index = () => {
 
   // ---- Zustand store blocks (Building Blocks mode) ----
   const storeBlocks = useFurnitureStore((state) => state.blocks);
+  const selectedFinishId = useFurnitureStore((state) => state.selectedFinishId);
 
   // ---- Sync storeBlocks → furnitureModel.blocks when in blocks mode ----
   useEffect(() => {
@@ -236,7 +238,7 @@ const Index = () => {
                     </div>
                   }
                 >
-                  <Viewer3D pieces={pieces} height={furnitureModel.params.height} />
+                  <Viewer3D pieces={pieces} height={furnitureModel.params.height} finishId={selectedFinishId} />
                 </Suspense>
                 <div className="pointer-events-none absolute left-3 top-3 rounded-md bg-background/85 px-2.5 py-1.5 text-[11px] font-mono text-muted-foreground shadow-soft backdrop-blur sm:left-4 sm:top-4 sm:px-3 sm:text-xs">
                   {furnitureModel.params.width} × {furnitureModel.params.height} ×{" "}
@@ -258,6 +260,7 @@ const Index = () => {
                   pieces={[]}
                   height={0}
                   blocks={furnitureModel.blocks}
+                  finishId={selectedFinishId}
                 />
               </Suspense>
             )}
@@ -314,6 +317,11 @@ const Index = () => {
                   <SelectItem value="solid-wood-20">Madera maciza 20 mm</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Finish / colour selector */}
+            <div className="mb-4 sm:mb-5">
+              <FinishSelector />
             </div>
 
             {/* Parametric params */}
@@ -421,7 +429,7 @@ const Index = () => {
                   </div>
                 }
               >
-                <Viewer3D pieces={pieces} height={furnitureModel.params.height} />
+                <Viewer3D pieces={pieces} height={furnitureModel.params.height} finishId={selectedFinishId} />
               </Suspense>
               {selectedPreset && (
                 <div className="pointer-events-none absolute left-3 top-3 rounded-md bg-background/85 px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm backdrop-blur">

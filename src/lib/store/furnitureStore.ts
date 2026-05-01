@@ -11,6 +11,7 @@ import { create } from 'zustand';
 import { type TemplateId, type TemplateDimensions, getTemplate } from '../templates/registry';
 import type { BuildingBlock, MaterialType } from '../types';
 import { validateSpanLocally } from '../validation/structuralValidator';
+import { DEFAULT_FINISH_ID } from '../finishes';
 
 // ---------------------------------------------------------------------------
 // State interface
@@ -22,10 +23,13 @@ interface FurnitureStoreState {
   blocks: BuildingBlock[];
   validationErrors: boolean;
   selectedMaterial: MaterialType;
+  /** ID of the active visual finish (colour + PBR properties) */
+  selectedFinishId: string;
 
   selectTemplate: (id: TemplateId) => void;
   setDimensions: (dims: TemplateDimensions) => void;
   setMaterial: (material: MaterialType) => void;
+  setFinish: (finishId: string) => void;
   clearTemplate: () => void;
   addBlock: (block: BuildingBlock) => void;
   removeBlock: (blockId: string) => void;
@@ -48,6 +52,7 @@ export const useFurnitureStore = create<FurnitureStoreState>()((set, get) => ({
   blocks: [],
   validationErrors: false,
   selectedMaterial: 'melamine-18',
+  selectedFinishId: DEFAULT_FINISH_ID,
 
   // --- Task 4.2: selectTemplate ---
   selectTemplate: (id: TemplateId) => {
@@ -109,6 +114,11 @@ export const useFurnitureStore = create<FurnitureStoreState>()((set, get) => ({
       validationErrors: false,
       dimensions: INITIAL_DIMENSIONS,
     });
+  },
+
+  // --- setFinish: change the visual finish ---
+  setFinish: (finishId: string) => {
+    set({ selectedFinishId: finishId });
   },
 
   // --- addBlock: append a manually-created block ---

@@ -1,12 +1,12 @@
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows, Grid } from "@react-three/drei";
-import { useMemo } from "react";
-import * as THREE from "three";
 import type { Piece } from "@/lib/furniture";
 import type { BuildingBlock, RoomConfiguration, RoomObstacle } from "@/lib/types";
 import { VALIDATION_COLORS } from "@/lib/types";
 import type { PresetId } from "@/lib/types";
 import { SCENE_PRESETS } from "@/lib/scene/scenePresets";
+import type { Finish } from "@/lib/finishes";
+import { getFinish, DEFAULT_FINISH_ID } from "@/lib/finishes";
 
 const MM = 0.001; // mm -> m
 const WALL_THICKNESS = 0.01; // 10 mm in meters
@@ -22,20 +22,21 @@ export interface Viewer3DProps {
   blocks?: BuildingBlock[];
   presetId?: PresetId | null;
   roomConfig?: RoomConfiguration | null;
+  /** Active finish ID — controls colour and PBR properties of all furniture pieces */
+  finishId?: string;
 }
 
 // ---------------------------------------------------------------------------
-// Wood material (existing)
+// Finish-aware material
 // ---------------------------------------------------------------------------
 
-function WoodMaterial() {
-  const color = useMemo(() => {
-    const root = getComputedStyle(document.documentElement);
-    const hsl = root.getPropertyValue("--wood-mid").trim();
-    return new THREE.Color(`hsl(${hsl})`);
-  }, []);
+function FurnitureMaterial({ finish }: { finish: Finish }) {
   return (
-    <meshStandardMaterial color={color} roughness={0.65} metalness={0.05} />
+    <meshStandardMaterial
+      color={finish.color}
+      roughness={finish.roughness}
+      metalness={finish.metalness}
+    />
   );
 }
 
@@ -43,13 +44,13 @@ function WoodMaterial() {
 // Existing parametric piece mesh
 // ---------------------------------------------------------------------------
 
-function PieceMesh({ piece }: { piece: Piece }) {
+function PieceMesh({ piece, finish }: { piece: Piece; finish: Finish }) {
   const [sx, sy, sz] = piece.size.map((v) => v * MM) as [number, number, number];
   const [px, py, pz] = piece.position.map((v) => v * MM) as [number, number, number];
   return (
     <mesh position={[px, py, pz]} castShadow receiveShadow>
       <boxGeometry args={[sx, sy, sz]} />
-      <WoodMaterial />
+      <FurnitureMaterial finish={finish} />
     </mesh>
   );
 }
@@ -58,7 +59,7 @@ function PieceMesh({ piece }: { piece: Piece }) {
 // Building Block mesh with validation color support
 // ---------------------------------------------------------------------------
 
-function BlockMesh({ block }: { block: BuildingBlock }) {
+function BlockMesh({ block, finish }: { block: BuildingBlock; finish: Finish }) {
   const sx = block.size.x * MM;
   const sy = block.size.y * MM;
   const sz = block.size.z * MM;
@@ -66,16 +67,9 @@ function BlockMesh({ block }: { block: BuildingBlock }) {
   const py = block.position.y * MM;
   const pz = block.position.z * MM;
 
-  // Determine color: use VALIDATION_COLORS override if not null, else default wood color
+  // Validation color takes priority over finish color.
+  // ok → null means "use finish color"; warning/error → override with validation color.
   const validationColor = VALIDATION_COLORS[block.visualValidationStatus];
-
-  const woodColor = useMemo(() => {
-    const root = getComputedStyle(document.documentElement);
-    const hsl = root.getPropertyValue("--wood-mid").trim();
-    return new THREE.Color(`hsl(${hsl})`);
-  }, []);
-
-  const color = validationColor !== null ? validationColor : woodColor;
 
   return (
     <mesh
@@ -85,7 +79,15 @@ function BlockMesh({ block }: { block: BuildingBlock }) {
       receiveShadow
     >
       <boxGeometry args={[sx, sy, sz]} />
-      <meshStandardMaterial color={color} roughness={0.65} metalness={0.05} />
+      {validationColor !== null ? (
+        <meshStandardMaterial
+          color={validationColor}
+          roughness={0.65}
+          metalness={0.05}
+        />
+      ) : (
+        <FurnitureMaterial finish={finish} />
+      )}
     </mesh>
   );
 }
@@ -287,8 +289,10 @@ export function Viewer3D({
   blocks,
   presetId,
   roomConfig,
+  finishId,
 }: Viewer3DProps) {
   const yOffset = (height / 2) * MM; // rest on the floor
+  const finish = getFinish(finishId ?? DEFAULT_FINISH_ID);
 
   return (
     <Canvas
@@ -310,7 +314,7 @@ export function Viewer3D({
       {/* Existing parametric pieces */}
       <group position={[0, yOffset, 0]}>
         {pieces.map((p) => (
-          <PieceMesh key={p.id} piece={p} />
+          <PieceMesh key={p.id} piece={p} finish={finish} />
         ))}
       </group>
 
@@ -318,7 +322,7 @@ export function Viewer3D({
       {blocks && blocks.length > 0 && (
         <group>
           {blocks.map((block) => (
-            <BlockMesh key={block.id} block={block} />
+            <BlockMesh key={block.id} block={block} finish={finish} />
           ))}
         </group>
       )}
