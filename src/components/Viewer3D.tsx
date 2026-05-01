@@ -1,5 +1,6 @@
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows, Grid } from "@react-three/drei";
+import { useState, useEffect, useRef } from "react";
 import type { Piece } from "@/lib/furniture";
 import type { BuildingBlock, RoomConfiguration, RoomObstacle } from "@/lib/types";
 import { VALIDATION_COLORS } from "@/lib/types";
@@ -24,6 +25,11 @@ export interface Viewer3DProps {
   roomConfig?: RoomConfiguration | null;
   /** Active finish ID — controls colour and PBR properties of all furniture pieces */
   finishId?: string;
+  /**
+   * Floor offset in mm for the furniture group.
+   * 0 = rests on the floor. Positive = elevated (e.g. suspended vanitory).
+   */
+  floorOffsetMm?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -280,6 +286,72 @@ function SceneLighting({ presetId }: { presetId?: PresetId | null }) {
 }
 
 // ---------------------------------------------------------------------------
+// Auto-positioning helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Computes the AABB of a set of blocks in mm (local space, origin at 0,0,0).
+ * Returns null if blocks array is empty.
+ */
+function computeBlocksAABB(
+  blocks: BuildingBlock[],
+): { minX: number; maxX: number; minZ: number; maxZ: number } | null {
+  if (blocks.length === 0) return null;
+  let minX = Infinity, maxX = -Infinity;
+  let minZ = Infinity, maxZ = -Infinity;
+  for (const b of blocks) {
+    minX = Math.min(minX, b.position.x - b.size.x / 2);
+    maxX = Math.max(maxX, b.position.x + b.size.x / 2);
+    minZ = Math.min(minZ, b.position.z - b.size.z / 2);
+    maxZ = Math.max(maxZ, b.position.z + b.size.z / 2);
+  }
+  return { minX, maxX, minZ, maxZ };
+}
+
+/**
+ * Computes the group offset [x, y, z] in meters to:
+ *   - Centre the furniture on the X axis (x = 0)
+ *   - Place the back face against the north wall (z = lengthM / 2 - depth)
+ *   - Lift by floorOffsetMm
+ */
+function computeGroupOffset(
+  blocks: BuildingBlock[],
+  presetId: PresetId | null | undefined,
+  floorOffsetMm: number,
+): [number, number, number] {
+  const MM = 0.001;
+  const aabb = computeBlocksAABB(blocks);
+  if (!aabb) return [0, floorOffsetMm * MM, 0];
+
+  const furnitureWidth = aabb.maxX - aabb.minX;
+  const furnitureDepth = aabb.maxZ - aabb.minZ;
+  const furnitureCentreX = (aabb.minX + aabb.maxX) / 2;
+
+  // Centre on X: shift so the furniture centre lands at x=0
+  const offsetX = -furnitureCentreX * MM;
+
+  // Place against north wall: north wall is at +Z = lengthM/2
+  // The back face of the furniture (maxZ) should touch the north wall.
+  let offsetZ = 0;
+  if (presetId) {
+    const preset = SCENE_PRESETS[presetId];
+    const lengthM = preset.roomDimensions.lengthMm * MM;
+    const northWallZ = lengthM / 2;
+    // Back face of furniture in world space = (aabb.maxZ * MM) + offsetZ = northWallZ
+    offsetZ = northWallZ - aabb.maxZ * MM;
+    // Clamp: don't push furniture outside the room on the south side
+    const southWallZ = -lengthM / 2;
+    if (offsetZ - furnitureDepth * MM < southWallZ) {
+      offsetZ = southWallZ + furnitureDepth * MM;
+    }
+  }
+
+  const offsetY = floorOffsetMm * MM;
+
+  return [offsetX, offsetY, offsetZ];
+}
+
+// ---------------------------------------------------------------------------
 // Main Viewer3D component
 // ---------------------------------------------------------------------------
 
@@ -290,72 +362,100 @@ export function Viewer3D({
   presetId,
   roomConfig,
   finishId,
+  floorOffsetMm = 0,
 }: Viewer3DProps) {
-  const yOffset = (height / 2) * MM; // rest on the floor
+  const yOffset = (height / 2) * MM; // parametric mode: rest on the floor
   const finish = getFinish(finishId ?? DEFAULT_FINISH_ID);
 
+  // Compute auto-positioning offset for blocks mode
+  const groupOffset = computeGroupOffset(blocks ?? [], presetId, floorOffsetMm);
+
+  // ---------------------------------------------------------------------------
+  // Fade transition overlay — triggers whenever presetId changes
+  // ---------------------------------------------------------------------------
+  const [fading, setFading] = useState(false);
+  const prevPresetRef = useRef(presetId);
+
+  useEffect(() => {
+    if (prevPresetRef.current !== presetId) {
+      prevPresetRef.current = presetId;
+      setFading(true);
+      const timer = setTimeout(() => setFading(false), 350);
+      return () => clearTimeout(timer);
+    }
+  }, [presetId]);
+
   return (
-    <Canvas
-      shadows
-      camera={{ position: [2.4, 1.6, 2.6], fov: 35 }}
-      className="!h-full !w-full"
-    >
-      <color attach="background" args={["#efe7da"]} />
-      <fog attach="fog" args={["#efe7da", 8, 18]} />
+    <div className="relative h-full w-full">
+      <Canvas
+        shadows
+        camera={{ position: [2.4, 1.6, 2.6], fov: 35 }}
+        className="!h-full !w-full"
+      >
+        <color attach="background" args={["#efe7da"]} />
+        <fog attach="fog" args={["#efe7da", 8, 18]} />
 
-      <SceneLighting presetId={presetId} />
+        <SceneLighting presetId={presetId} />
 
-      {/* Scene Preset geometry (room shell) */}
-      {presetId && <PresetScene presetId={presetId} />}
+        {/* Scene Preset geometry (room shell) */}
+        {presetId && <PresetScene presetId={presetId} />}
 
-      {/* Room Configuration geometry (custom room + obstacles) */}
-      {roomConfig && <RoomConfigScene roomConfig={roomConfig} />}
+        {/* Room Configuration geometry (custom room + obstacles) */}
+        {roomConfig && <RoomConfigScene roomConfig={roomConfig} />}
 
-      {/* Existing parametric pieces */}
-      <group position={[0, yOffset, 0]}>
-        {pieces.map((p) => (
-          <PieceMesh key={p.id} piece={p} finish={finish} />
-        ))}
-      </group>
-
-      {/* Building Blocks */}
-      {blocks && blocks.length > 0 && (
-        <group>
-          {blocks.map((block) => (
-            <BlockMesh key={block.id} block={block} finish={finish} />
+        {/* Existing parametric pieces */}
+        <group position={[0, yOffset, 0]}>
+          {pieces.map((p) => (
+            <PieceMesh key={p.id} piece={p} finish={finish} />
           ))}
         </group>
-      )}
 
-      <ContactShadows
-        position={[0, 0, 0]}
-        opacity={0.45}
-        scale={8}
-        blur={2.4}
-        far={4}
-      />
-      <Grid
-        position={[0, 0.001, 0]}
-        args={[20, 20]}
-        cellSize={0.1}
-        cellThickness={0.6}
-        sectionSize={1}
-        sectionThickness={1.2}
-        sectionColor="#7a5a3a"
-        cellColor="#b8a489"
-        fadeDistance={10}
-        fadeStrength={1.5}
-        infiniteGrid
-      />
+        {/* Building Blocks — auto-positioned against north wall, centred on X */}
+        {blocks && blocks.length > 0 && (
+          <group position={groupOffset}>
+            {blocks.map((block) => (
+              <BlockMesh key={block.id} block={block} finish={finish} />
+            ))}
+          </group>
+        )}
 
-      <Environment preset="apartment" />
-      <OrbitControls
-        target={[0, yOffset, 0]}
-        enableDamping
-        minDistance={1.2}
-        maxDistance={8}
-        maxPolarAngle={Math.PI / 2.05}
+        <ContactShadows
+          position={[0, 0, 0]}
+          opacity={0.45}
+          scale={8}
+          blur={2.4}
+          far={4}
+        />
+        <Grid
+          position={[0, 0.001, 0]}
+          args={[20, 20]}
+          cellSize={0.1}
+          cellThickness={0.6}
+          sectionSize={1}
+          sectionThickness={1.2}
+          sectionColor="#7a5a3a"
+          cellColor="#b8a489"
+          fadeDistance={10}
+          fadeStrength={1.5}
+          infiniteGrid
+        />
+
+        <Environment preset="apartment" />
+        <OrbitControls
+          target={[0, yOffset, 0]}
+          enableDamping
+          minDistance={1.2}
+          maxDistance={8}
+          maxPolarAngle={Math.PI / 2.05}
+        />
+      </Canvas>
+
+      {/* Fade overlay — black overlay that fades in/out on preset change */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 bg-black transition-opacity duration-300"
+        style={{ opacity: fading ? 0.35 : 0 }}
       />
-    </Canvas>
+    </div>
   );
 }

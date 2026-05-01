@@ -259,7 +259,7 @@ export interface RoomConfigurationExport {
 // Scene presets
 // ---------------------------------------------------------------------------
 
-export type PresetId = 'kitchen' | 'bedroom' | 'living-room';
+export type PresetId = 'kitchen' | 'bedroom' | 'living-room' | 'bathroom';
 
 export interface ScenePreset {
   id: PresetId;

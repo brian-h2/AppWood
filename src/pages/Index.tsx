@@ -48,7 +48,7 @@ const INITIAL_FURNITURE_MODEL: FurnitureModel = {
 // Scene preset cards
 // ---------------------------------------------------------------------------
 
-const PRESET_IDS: PresetId[] = ["kitchen", "bedroom", "living-room"];
+const PRESET_IDS: PresetId[] = ["kitchen", "bathroom", "bedroom", "living-room"];
 
 interface PresetCardProps {
   presetId: PresetId;
@@ -107,6 +107,8 @@ const Index = () => {
   // ---- Zustand store blocks (Building Blocks mode) ----
   const storeBlocks = useFurnitureStore((state) => state.blocks);
   const selectedFinishId = useFurnitureStore((state) => state.selectedFinishId);
+  const activePresetId = useFurnitureStore((state) => state.activePresetId);
+  const storeFloorOffsetMm = useFurnitureStore((state) => state.floorOffsetMm);
 
   // ---- Sync storeBlocks → furnitureModel.blocks when in blocks mode ----
   useEffect(() => {
@@ -261,6 +263,8 @@ const Index = () => {
                   height={0}
                   blocks={furnitureModel.blocks}
                   finishId={selectedFinishId}
+                  presetId={activePresetId}
+                  floorOffsetMm={storeFloorOffsetMm}
                 />
               </Suspense>
             )}
@@ -402,7 +406,7 @@ const Index = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {PRESET_IDS.map((id) => (
                 <PresetCard
                   key={id}
@@ -429,7 +433,23 @@ const Index = () => {
                   </div>
                 }
               >
-                <Viewer3D pieces={pieces} height={furnitureModel.params.height} finishId={selectedFinishId} />
+                {furnitureModel.designMode === "blocks" ? (
+                  <Viewer3D
+                    pieces={[]}
+                    height={0}
+                    blocks={furnitureModel.blocks}
+                    finishId={selectedFinishId}
+                    presetId={selectedPreset}
+                    floorOffsetMm={storeFloorOffsetMm}
+                  />
+                ) : (
+                  <Viewer3D
+                    pieces={pieces}
+                    height={furnitureModel.params.height}
+                    finishId={selectedFinishId}
+                    presetId={selectedPreset}
+                  />
+                )}
               </Suspense>
               {selectedPreset && (
                 <div className="pointer-events-none absolute left-3 top-3 rounded-md bg-background/85 px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm backdrop-blur">

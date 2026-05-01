@@ -9,7 +9,7 @@
 
 import { create } from 'zustand';
 import { type TemplateId, type TemplateDimensions, getTemplate } from '../templates/registry';
-import type { BuildingBlock, MaterialType } from '../types';
+import type { BuildingBlock, MaterialType, PresetId } from '../types';
 import { validateSpanLocally } from '../validation/structuralValidator';
 import { DEFAULT_FINISH_ID } from '../finishes';
 
@@ -25,6 +25,16 @@ interface FurnitureStoreState {
   selectedMaterial: MaterialType;
   /** ID of the active visual finish (colour + PBR properties) */
   selectedFinishId: string;
+  /**
+   * Scene preset automatically applied when a template is selected.
+   * null = no preset active (user hasn't selected a template yet).
+   */
+  activePresetId: PresetId | null;
+  /**
+   * Floor offset in mm for the furniture group in the viewer.
+   * Derived from the selected template's floorOffsetMm.
+   */
+  floorOffsetMm: number;
 
   selectTemplate: (id: TemplateId) => void;
   setDimensions: (dims: TemplateDimensions) => void;
@@ -53,6 +63,8 @@ export const useFurnitureStore = create<FurnitureStoreState>()((set, get) => ({
   validationErrors: false,
   selectedMaterial: 'melamine-18',
   selectedFinishId: DEFAULT_FINISH_ID,
+  activePresetId: null,
+  floorOffsetMm: 0,
 
   // --- Task 4.2: selectTemplate ---
   selectTemplate: (id: TemplateId) => {
@@ -62,6 +74,9 @@ export const useFurnitureStore = create<FurnitureStoreState>()((set, get) => ({
       selectedTemplateId: id,
       dimensions: template.defaultDimensions,
       blocks,
+      // Auto-apply the scene preset and floor offset from the template metadata
+      activePresetId: template.autoPresetId,
+      floorOffsetMm: template.floorOffsetMm,
     });
   },
 
@@ -113,6 +128,8 @@ export const useFurnitureStore = create<FurnitureStoreState>()((set, get) => ({
       blocks: [],
       validationErrors: false,
       dimensions: INITIAL_DIMENSIONS,
+      activePresetId: null,
+      floorOffsetMm: 0,
     });
   },
 

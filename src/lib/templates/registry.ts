@@ -3,6 +3,7 @@
 // T = 18 mm is the standard material thickness used throughout.
 
 import type { BuildingBlock, BlockType, MaterialType, EdgeBandingConfig } from '../types';
+import type { PresetId } from '../types';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -31,6 +32,16 @@ export interface TemplateDef {
   defaultDimensions: TemplateDimensions;
   /** Pure function: given global dims, returns the full BuildingBlock[] */
   anchorFn: (dims: TemplateDimensions) => BuildingBlock[];
+  /**
+   * Scene preset that best matches this template's category.
+   * Used by the store to auto-apply the environment when a template is selected.
+   */
+  autoPresetId: PresetId;
+  /**
+   * Floor offset in mm applied to the furniture group in the viewer.
+   * 0 = rests on the floor. Positive = elevated (e.g. suspended vanitory at 200 mm).
+   */
+  floorOffsetMm: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -523,36 +534,48 @@ export const TEMPLATE_REGISTRY: Record<TemplateId, TemplateDef> = {
     nameEs: 'Alacena de Cocina',
     defaultDimensions: { W: 800, H: 600, D: 300 },
     anchorFn: alacenaAnchorFn,
+    autoPresetId: 'kitchen',
+    floorOffsetMm: 0,
   },
   'escritorio-flotante': {
     id: 'escritorio-flotante',
     nameEs: 'Escritorio Flotante',
     defaultDimensions: { W: 1200, H: 150, D: 500 },
     anchorFn: escritorioAnchorFn,
+    autoPresetId: 'bedroom',
+    floorOffsetMm: 0,
   },
   'rack-tv-bajo': {
     id: 'rack-tv-bajo',
     nameEs: 'Rack de TV Bajo',
     defaultDimensions: { W: 1600, H: 450, D: 400 },
     anchorFn: rackTvAnchorFn,
+    autoPresetId: 'living-room',
+    floorOffsetMm: 0,
   },
   'vestidor-abierto': {
     id: 'vestidor-abierto',
     nameEs: 'Vestidor Abierto',
     defaultDimensions: { W: 1000, H: 2000, D: 550 },
     anchorFn: vestidorAnchorFn,
+    autoPresetId: 'bedroom',
+    floorOffsetMm: 0,
   },
   'vanitory-suspendido': {
     id: 'vanitory-suspendido',
     nameEs: 'Vanitory Suspendido',
     defaultDimensions: { W: 600, H: 500, D: 450 },
     anchorFn: vanitoryAnchorFn,
+    autoPresetId: 'bathroom',
+    floorOffsetMm: 200,
   },
   'biblioteca-piso': {
     id: 'biblioteca-piso',
     nameEs: 'Biblioteca de Piso',
     defaultDimensions: { W: 800, H: 1800, D: 300 },
     anchorFn: bibliotecaAnchorFn,
+    autoPresetId: 'living-room',
+    floorOffsetMm: 0,
   },
 };
 

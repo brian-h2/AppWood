@@ -3,35 +3,53 @@ import type { PresetId, ScenePreset } from '../types';
 
 // ---------------------------------------------------------------------------
 // Scene preset definitions
+//
+// Lighting philosophy per preset:
+//   kitchen / bathroom — Technical, clear light. Neutral white (~6000 K).
+//     High ambient (0.8) to eliminate harsh shadows that hinder design work.
+//   bedroom — Warm, dim light (~3000 K). Low ambient (0.4) with a soft
+//     directional that simulates a bedside lamp or sunset.
+//   living-room — Balanced. Strong directional (1.0) at 45° to simulate
+//     a large window, generating depth-giving shadows.
 // ---------------------------------------------------------------------------
 
 export const SCENE_PRESETS: Record<PresetId, ScenePreset> = {
   kitchen: {
     id: 'kitchen',
-    labelEs: 'Cocina básica',
+    labelEs: 'Cocina',
     ambientIntensity: 0.8,
-    directionalIntensity: 1.0,
-    directionalPosition: [3, 5, 3],
+    directionalIntensity: 0.7,
+    directionalPosition: [2, 5, 2],
     wallColor: '#F5F5F0',
-    floorColor: '#C8B89A',
+    floorColor: '#C8C0B0',
     roomDimensions: { lengthMm: 4000, widthMm: 3500, heightMm: 2600 },
+  },
+  bathroom: {
+    id: 'bathroom',
+    labelEs: 'Baño',
+    ambientIntensity: 0.8,
+    directionalIntensity: 0.6,
+    directionalPosition: [1, 4, 1],
+    wallColor: '#EAF0F0',
+    floorColor: '#B8C4C4',
+    roomDimensions: { lengthMm: 2800, widthMm: 2200, heightMm: 2400 },
   },
   bedroom: {
     id: 'bedroom',
-    labelEs: 'Dormitorio minimalista',
-    ambientIntensity: 0.6,
-    directionalIntensity: 0.8,
-    directionalPosition: [2, 4, 2],
+    labelEs: 'Dormitorio',
+    ambientIntensity: 0.4,
+    directionalIntensity: 0.5,
+    directionalPosition: [2, 3, 1],
     wallColor: '#E8E0D8',
     floorColor: '#8B7355',
     roomDimensions: { lengthMm: 4500, widthMm: 3800, heightMm: 2500 },
   },
   'living-room': {
     id: 'living-room',
-    labelEs: 'Salón moderno',
-    ambientIntensity: 0.7,
-    directionalIntensity: 0.9,
-    directionalPosition: [4, 6, 2],
+    labelEs: 'Living',
+    ambientIntensity: 0.5,
+    directionalIntensity: 1.0,
+    directionalPosition: [5, 5, -3],
     wallColor: '#FFFFFF',
     floorColor: '#6B5B45',
     roomDimensions: { lengthMm: 6000, widthMm: 5000, heightMm: 2800 },
