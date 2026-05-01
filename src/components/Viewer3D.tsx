@@ -1,11 +1,12 @@
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows, Grid } from "@react-three/drei";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import type { Piece } from "@/lib/furniture";
 import type { BuildingBlock, RoomConfiguration, RoomObstacle } from "@/lib/types";
 import { VALIDATION_COLORS } from "@/lib/types";
 import type { PresetId } from "@/lib/types";
 import { SCENE_PRESETS } from "@/lib/scene/scenePresets";
+import { makeFloorTexture, makeWallTexture } from "@/lib/scene/proceduralTextures";
 import type { Finish } from "@/lib/finishes";
 import { getFinish, DEFAULT_FINISH_ID } from "@/lib/finishes";
 
@@ -99,7 +100,7 @@ function BlockMesh({ block, finish }: { block: BuildingBlock; finish: Finish }) 
 }
 
 // ---------------------------------------------------------------------------
-// Scene Preset geometry group
+// Scene Preset geometry — independent planes with procedural textures
 // ---------------------------------------------------------------------------
 
 function PresetScene({ presetId }: { presetId: PresetId }) {
@@ -110,42 +111,73 @@ function PresetScene({ presetId }: { presetId: PresetId }) {
   const widthM = widthMm * MM;
   const heightM = heightMm * MM;
 
+  // Generate procedural textures once per preset change
+  const floorTex = useMemo(() => {
+    const t = makeFloorTexture(preset.floorPattern, preset.floorColor);
+    t.repeat.set(widthM * preset.textureRepeat, lengthM * preset.textureRepeat);
+    return t;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presetId]);
+
+  const wallTex = useMemo(() => {
+    const t = makeWallTexture(preset.wallPattern, preset.wallColor);
+    t.repeat.set(widthM * preset.textureRepeat, heightM * preset.textureRepeat);
+    return t;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presetId]);
+
+  const accentTex = useMemo(() => {
+    if (!preset.accentWallColor) return null;
+    const t = makeWallTexture('cement', preset.accentWallColor);
+    t.repeat.set(widthM * preset.textureRepeat, heightM * preset.textureRepeat);
+    return t;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presetId]);
+
   return (
     <group>
-      {/* Floor */}
-      <mesh position={[0, 0, 0]}>
-        <boxGeometry args={[widthM, 0.01, lengthM]} />
-        <meshStandardMaterial color={preset.floorColor} />
+      {/* Floor — PlaneGeometry rotated flat, receives shadows */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+        <planeGeometry args={[widthM, lengthM]} />
+        <meshStandardMaterial
+          map={floorTex}
+          roughness={preset.floorRoughness}
+          metalness={preset.floorMetalness}
+        />
       </mesh>
 
-      {/* Ceiling */}
-      <mesh position={[0, heightM, 0]}>
-        <boxGeometry args={[widthM, 0.01, lengthM]} />
-        <meshStandardMaterial color={preset.wallColor} />
+      {/* Ceiling — plain color, no texture needed */}
+      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, heightM, 0]}>
+        <planeGeometry args={[widthM, lengthM]} />
+        <meshStandardMaterial color={preset.wallColor} roughness={0.9} metalness={0} />
       </mesh>
 
-      {/* North wall (positive Z) */}
-      <mesh position={[0, heightM / 2, lengthM / 2]}>
-        <boxGeometry args={[widthM, heightM, WALL_THICKNESS]} />
-        <meshStandardMaterial color={preset.wallColor} />
+      {/* North wall — accent wall (behind furniture), faces inward */}
+      <mesh rotation={[0, Math.PI, 0]} position={[0, heightM / 2, lengthM / 2]} receiveShadow>
+        <planeGeometry args={[widthM, heightM]} />
+        <meshStandardMaterial
+          map={accentTex ?? wallTex}
+          roughness={preset.wallRoughness}
+          metalness={0}
+        />
       </mesh>
 
-      {/* South wall (negative Z) */}
-      <mesh position={[0, heightM / 2, -lengthM / 2]}>
-        <boxGeometry args={[widthM, heightM, WALL_THICKNESS]} />
-        <meshStandardMaterial color={preset.wallColor} />
+      {/* South wall */}
+      <mesh rotation={[0, 0, 0]} position={[0, heightM / 2, -lengthM / 2]} receiveShadow>
+        <planeGeometry args={[widthM, heightM]} />
+        <meshStandardMaterial map={wallTex} roughness={preset.wallRoughness} metalness={0} />
       </mesh>
 
-      {/* East wall (positive X) */}
-      <mesh position={[widthM / 2, heightM / 2, 0]}>
-        <boxGeometry args={[WALL_THICKNESS, heightM, lengthM]} />
-        <meshStandardMaterial color={preset.wallColor} />
+      {/* East wall */}
+      <mesh rotation={[0, -Math.PI / 2, 0]} position={[widthM / 2, heightM / 2, 0]} receiveShadow>
+        <planeGeometry args={[lengthM, heightM]} />
+        <meshStandardMaterial map={wallTex} roughness={preset.wallRoughness} metalness={0} />
       </mesh>
 
-      {/* West wall (negative X) */}
-      <mesh position={[-widthM / 2, heightM / 2, 0]}>
-        <boxGeometry args={[WALL_THICKNESS, heightM, lengthM]} />
-        <meshStandardMaterial color={preset.wallColor} />
+      {/* West wall */}
+      <mesh rotation={[0, Math.PI / 2, 0]} position={[-widthM / 2, heightM / 2, 0]} receiveShadow>
+        <planeGeometry args={[lengthM, heightM]} />
+        <meshStandardMaterial map={wallTex} roughness={preset.wallRoughness} metalness={0} />
       </mesh>
     </group>
   );

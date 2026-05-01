@@ -199,8 +199,8 @@ const Index = () => {
             {(
               [
                 { id: "designer", label: "Diseñador", icon: Layers },
-                { id: "environments", label: "Entornos", icon: Home },
-                { id: "ar", label: "AR", icon: Camera },
+                // { id: "environments", label: "Entornos", icon: Home },
+                // { id: "ar", label: "AR", icon: Camera },
               ] as const
             ).map(({ id, label, icon: Icon }) => (
               <button

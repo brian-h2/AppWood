@@ -270,6 +270,23 @@ export interface ScenePreset {
   wallColor: string;
   floorColor: string;
   roomDimensions: RoomDimensions;
+  /** PBR roughness for floor surface (0 = mirror, 1 = fully rough) */
+  floorRoughness: number;
+  /** PBR roughness for wall surface */
+  wallRoughness: number;
+  /** Subtle metalness for ceramic/tile surfaces */
+  floorMetalness: number;
+  /** Procedural texture pattern for the floor */
+  floorPattern: 'wood-parquet' | 'tile-grid' | 'carpet' | 'concrete';
+  /** Procedural texture pattern for the walls */
+  wallPattern: 'plaster' | 'tile-subway' | 'paint-flat' | 'cement';
+  /** How many times the texture repeats per meter */
+  textureRepeat: number;
+  /**
+   * Optional accent wall color for the north wall (behind the furniture).
+   * When set, the north wall uses this color instead of wallColor.
+   */
+  accentWallColor?: string;
 }
 
 // ---------------------------------------------------------------------------
