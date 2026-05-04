@@ -30,6 +30,7 @@ import { ParametricForm } from "@/components/ParametricForm";
 import { CustomPieceForm } from "@/components/CustomPieceForm";
 import { FinishSelector } from "@/components/FinishSelector";
 import { useFurnitureStore } from "@/lib/store/furnitureStore";
+import { computeDoorBlocks, computeDoorBlocksParametric } from "@/lib/doors";
 
 // ---------------------------------------------------------------------------
 // Initial state
@@ -106,9 +107,20 @@ const Index = () => {
 
   // ---- Zustand store blocks (Building Blocks mode) ----
   const storeBlocks = useFurnitureStore((state) => state.blocks);
+  const storeDoorBlocks = useFurnitureStore((state) => state.doorBlocks);
   const selectedFinishId = useFurnitureStore((state) => state.selectedFinishId);
   const activePresetId = useFurnitureStore((state) => state.activePresetId);
   const storeFloorOffsetMm = useFurnitureStore((state) => state.floorOffsetMm);
+  const doorConfig = useFurnitureStore((state) => state.doorConfig);
+
+  // ---- Parametric door blocks — computed from params + shared doorConfig ----
+  const parametricDoorBlocks = useMemo(() => {
+    const p = furnitureModel.params;
+    return computeDoorBlocksParametric(
+      p.width, p.height, p.depth,
+      doorConfig, furnitureModel.selectedMaterial,
+    );
+  }, [furnitureModel.params, doorConfig, furnitureModel.selectedMaterial]);
 
   // ---- Sync storeBlocks → furnitureModel.blocks when in blocks mode ----
   useEffect(() => {
@@ -124,22 +136,27 @@ const Index = () => {
   );
   const cutList = useMemo(() => aggregateCutList(pieces), [pieces]);
 
-  // ---- Derived: blocks mode ----
-  const blocksCutList = useMemo(
-    () => generateCutList(furnitureModel.blocks, nestingConfig),
-    [furnitureModel.blocks, nestingConfig],
+  // ---- Parametric door cut list items (appended to the main cut list display) ----
+  const parametricDoorCutList = useMemo(
+    () => generateCutList(parametricDoorBlocks, nestingConfig),
+    [parametricDoorBlocks, nestingConfig],
   );
 
-  // nestPieces is used here to keep the connection wired; NestingView still
-  // receives the aggregated CutItem[] for display.
-  const _nestedSheets = useMemo(
-    () =>
-      nestPieces(
-        cutList.map((item) => ({ ...item, grainDirection: "none" as const })),
-        nestingConfig,
-      ),
-    [cutList, nestingConfig],
+  // ---- Derived: blocks mode ----
+  const blocksCutList = useMemo(
+    () => generateCutList([...furnitureModel.blocks, ...storeDoorBlocks], nestingConfig),
+    [furnitureModel.blocks, storeDoorBlocks, nestingConfig],
   );
+
+  // nestPieces keeps the nesting wired; NestingView receives aggregated CutItem[] for display.
+  useEffect(() => {
+    // Pre-warm the nesting computation so NestingView renders faster on first open.
+    nestPieces(
+      cutList.map((item) => ({ ...item, grainDirection: "none" as const })),
+      nestingConfig,
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cutList]);
 
   // ---- Handlers ----
   const handleParamsChange = (params: ShelfParams) => {
@@ -199,8 +216,8 @@ const Index = () => {
             {(
               [
                 { id: "designer", label: "Diseñador", icon: Layers },
-                // { id: "environments", label: "Entornos", icon: Home },
-                // { id: "ar", label: "AR", icon: Camera },
+                { id: "environments", label: "Entornos", icon: Home },
+                { id: "ar", label: "AR", icon: Camera },
               ] as const
             ).map(({ id, label, icon: Icon }) => (
               <button
@@ -228,9 +245,19 @@ const Index = () => {
       {/* TAB: Diseñador                                                       */}
       {/* ================================================================== */}
       {activeTab === "designer" && (
-        <main className="mx-auto max-w-[1600px] gap-4 p-3 sm:p-4 lg:grid lg:grid-cols-[320px_1fr_380px]">
-          {/* ---- Viewer (mobile: first, desktop: middle column) ---- */}
-          <section className="relative h-[55vw] min-h-[260px] overflow-hidden rounded-xl border border-border bg-card shadow-elegant lg:order-2 lg:h-auto lg:min-h-[640px]">
+        <main className="mx-auto max-w-[1600px] gap-4 p-3 sm:p-4
+          grid grid-cols-1
+          md:grid-cols-2
+          lg:grid-cols-[300px_1fr_360px]
+          xl:grid-cols-[320px_1fr_380px]">
+          {/* ---- Viewer (mobile: first, tablet: spans full 2-col, desktop: middle column) ---- */}
+          <section className="
+            relative overflow-hidden rounded-xl border border-border bg-card shadow-elegant
+            col-span-1
+            h-[60vw] min-h-[280px] max-h-[420px]
+            md:col-span-2 md:h-[45vw] md:max-h-[560px]
+            lg:order-2 lg:col-span-1 lg:h-auto lg:max-h-none lg:min-h-[640px]
+          ">
             {furnitureModel.designMode === "parametric" ? (
               <>
                 <Suspense
@@ -240,14 +267,19 @@ const Index = () => {
                     </div>
                   }
                 >
-                  <Viewer3D pieces={pieces} height={furnitureModel.params.height} finishId={selectedFinishId} />
+                  <Viewer3D
+                    pieces={pieces}
+                    height={furnitureModel.params.height}
+                    finishId={selectedFinishId}
+                    doorBlocks={parametricDoorBlocks}
+                  />
                 </Suspense>
                 <div className="pointer-events-none absolute left-3 top-3 rounded-md bg-background/85 px-2.5 py-1.5 text-[11px] font-mono text-muted-foreground shadow-soft backdrop-blur sm:left-4 sm:top-4 sm:px-3 sm:text-xs">
                   {furnitureModel.params.width} × {furnitureModel.params.height} ×{" "}
                   {furnitureModel.params.depth} mm
                 </div>
                 <div className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-background/85 px-2.5 py-1.5 text-[10px] text-muted-foreground shadow-soft backdrop-blur sm:bottom-4 sm:right-4 sm:text-[11px]">
-                  Arrastra para rotar · Scroll para zoom
+                  Arrastra para rotar · Scroll para zoom · Clic en puerta para abrir
                 </div>
               </>
             ) : (
@@ -262,6 +294,7 @@ const Index = () => {
                   pieces={[]}
                   height={0}
                   blocks={furnitureModel.blocks}
+                  doorBlocks={storeDoorBlocks}
                   finishId={selectedFinishId}
                   presetId={activePresetId}
                   floorOffsetMm={storeFloorOffsetMm}
@@ -270,8 +303,13 @@ const Index = () => {
             )}
           </section>
 
-          {/* ---- Sidebar params (mobile: second, desktop: left column) ---- */}
-          <aside className="overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-soft sm:p-5 lg:order-1 lg:max-h-none">
+          {/* ---- Sidebar params (mobile: second, tablet: left col, desktop: left column) ---- */}
+          <aside className="
+            overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-soft sm:p-5
+            col-span-1
+            md:col-span-1 md:max-h-[600px]
+            lg:order-1 lg:max-h-none
+          ">
             {/* Mode toggle */}
             <div className="mb-4 sm:mb-5">
               <h2 className="font-display text-base font-bold">Modo de diseño</h2>
@@ -354,8 +392,13 @@ const Index = () => {
             )}
           </aside>
 
-          {/* ---- Right panel: cut list / nesting (mobile: third, desktop: right column) ---- */}
-          <aside className="rounded-xl border border-border bg-card p-4 shadow-soft sm:p-5 lg:order-3">
+          {/* ---- Right panel: cut list / nesting (mobile: third, tablet: right col, desktop: right column) ---- */}
+          <aside className="
+            rounded-xl border border-border bg-card p-4 shadow-soft sm:p-5
+            col-span-1
+            md:col-span-1 md:max-h-[600px] md:overflow-y-auto
+            lg:order-3 lg:max-h-none
+          ">
             <Tabs defaultValue="list" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="list">Lista de corte</TabsTrigger>
@@ -363,13 +406,39 @@ const Index = () => {
               </TabsList>
               <TabsContent value="list" className="mt-4">
                 {furnitureModel.designMode === "parametric" ? (
-                  <CutList items={cutList} />
+                  <div className="space-y-4">
+                    <CutList items={cutList} />
+                    {/* Door panels appended below the main parametric cut list */}
+                    {parametricDoorCutList.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                          Puertas
+                        </p>
+                        {parametricDoorCutList.map((item) => (
+                          <div
+                            key={item.blockId}
+                            className="rounded-md border border-border bg-primary/5 px-3 py-2 text-xs"
+                          >
+                            <span className="font-medium">{item.name}</span>
+                            <span className="ml-2 text-muted-foreground">
+                              {item.cutLengthMm} × {item.cutWidthMm} × {item.thicknessMm} mm
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 ) : blocksCutList.length > 0 ? (
                   <div className="space-y-2">
                     {blocksCutList.map((item) => (
                       <div
                         key={item.blockId}
-                        className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs"
+                        className={[
+                          "rounded-md border px-3 py-2 text-xs",
+                          item.name.startsWith("Puerta")
+                            ? "border-border bg-primary/5"
+                            : "border-border bg-muted/30",
+                        ].join(" ")}
                       >
                         <span className="font-medium">{item.name}</span>
                         <span className="ml-2 text-muted-foreground">
@@ -438,6 +507,7 @@ const Index = () => {
                     pieces={[]}
                     height={0}
                     blocks={furnitureModel.blocks}
+                    doorBlocks={storeDoorBlocks}
                     finishId={selectedFinishId}
                     presetId={selectedPreset}
                     floorOffsetMm={storeFloorOffsetMm}
@@ -448,6 +518,7 @@ const Index = () => {
                     height={furnitureModel.params.height}
                     finishId={selectedFinishId}
                     presetId={selectedPreset}
+                    doorBlocks={parametricDoorBlocks}
                   />
                 )}
               </Suspense>

@@ -115,7 +115,9 @@ export function generateCutList(
 
     result.push({
       blockId:               block.id,
-      name:                  `${block.type}-${block.id.slice(0, 6)}`,
+      name:                  block.type === 'door'
+        ? `Puerta-${block.id.includes('left') ? 'Izq' : block.id.includes('right') ? 'Der' : 'Única'}`
+        : `${block.type}-${block.id.slice(0, 6)}`,
       nominalLengthMm,
       nominalWidthMm,
       thicknessMm,

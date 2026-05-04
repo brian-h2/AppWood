@@ -9,9 +9,11 @@
 
 import { create } from 'zustand';
 import { type TemplateId, type TemplateDimensions, getTemplate } from '../templates/registry';
-import type { BuildingBlock, MaterialType, PresetId } from '../types';
+import type { BuildingBlock, MaterialType, PresetId, DoorConfig, DoorBlock } from '../types';
+import { DEFAULT_DOOR_CONFIG } from '../types';
 import { validateSpanLocally } from '../validation/structuralValidator';
 import { DEFAULT_FINISH_ID } from '../finishes';
+import { computeDoorBlocks } from '../doors';
 
 // ---------------------------------------------------------------------------
 // State interface
@@ -35,11 +37,16 @@ interface FurnitureStoreState {
    * Derived from the selected template's floorOffsetMm.
    */
   floorOffsetMm: number;
+  /** Door configuration for the active template */
+  doorConfig: DoorConfig;
+  /** Generated door blocks (derived from doorConfig + dimensions) */
+  doorBlocks: DoorBlock[];
 
   selectTemplate: (id: TemplateId) => void;
   setDimensions: (dims: TemplateDimensions) => void;
   setMaterial: (material: MaterialType) => void;
   setFinish: (finishId: string) => void;
+  setDoorConfig: (config: DoorConfig) => void;
   clearTemplate: () => void;
   addBlock: (block: BuildingBlock) => void;
   removeBlock: (blockId: string) => void;
@@ -65,15 +72,25 @@ export const useFurnitureStore = create<FurnitureStoreState>()((set, get) => ({
   selectedFinishId: DEFAULT_FINISH_ID,
   activePresetId: null,
   floorOffsetMm: 0,
+  doorConfig: DEFAULT_DOOR_CONFIG,
+  doorBlocks: [],
 
   // --- Task 4.2: selectTemplate ---
   selectTemplate: (id: TemplateId) => {
     const template = getTemplate(id);
     const blocks = template.anchorFn(template.defaultDimensions);
+    const { doorConfig, selectedMaterial } = get();
+    const doorBlocks = computeDoorBlocks(
+      template.defaultDimensions.W,
+      template.defaultDimensions.H,
+      template.defaultDimensions.D,
+      doorConfig, selectedMaterial, id,
+    );
     set({
       selectedTemplateId: id,
       dimensions: template.defaultDimensions,
       blocks,
+      doorBlocks,
       // Auto-apply the scene preset and floor offset from the template metadata
       activePresetId: template.autoPresetId,
       floorOffsetMm: template.floorOffsetMm,
@@ -82,7 +99,7 @@ export const useFurnitureStore = create<FurnitureStoreState>()((set, get) => ({
 
   // --- Task 4.3: setDimensions with span validation ---
   setDimensions: (dims: TemplateDimensions) => {
-    const { selectedTemplateId, selectedMaterial } = get();
+    const { selectedTemplateId, selectedMaterial, doorConfig } = get();
 
     // Guard: no-op if no template is selected
     if (selectedTemplateId === null) return;
@@ -102,8 +119,14 @@ export const useFurnitureStore = create<FurnitureStoreState>()((set, get) => ({
       }
     }
 
+    // Recompute door blocks with new dimensions
+    const newDoorBlocks = computeDoorBlocks(
+      dims.W, dims.H, dims.D,
+      doorConfig, selectedMaterial, selectedTemplateId,
+    );
+
     // Atomic state update
-    set({ dimensions: dims, blocks: newBlocks, validationErrors: hasErrors });
+    set({ dimensions: dims, blocks: newBlocks, validationErrors: hasErrors, doorBlocks: newDoorBlocks });
   },
 
   // --- Task 4.4: setMaterial ---
@@ -130,12 +153,26 @@ export const useFurnitureStore = create<FurnitureStoreState>()((set, get) => ({
       dimensions: INITIAL_DIMENSIONS,
       activePresetId: null,
       floorOffsetMm: 0,
+      doorConfig: DEFAULT_DOOR_CONFIG,
+      doorBlocks: [],
     });
   },
 
   // --- setFinish: change the visual finish ---
   setFinish: (finishId: string) => {
     set({ selectedFinishId: finishId });
+  },
+
+  // --- setDoorConfig: update door configuration and recompute door blocks ---
+  setDoorConfig: (config: DoorConfig) => {
+    const { selectedTemplateId, dimensions, selectedMaterial } = get();
+    const doorBlocks = selectedTemplateId
+      ? computeDoorBlocks(
+          dimensions.W, dimensions.H, dimensions.D,
+          config, selectedMaterial, selectedTemplateId,
+        )
+      : [];
+    set({ doorConfig: config, doorBlocks });
   },
 
   // --- addBlock: append a manually-created block ---

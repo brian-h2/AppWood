@@ -3,6 +3,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import type { ShelfParams } from "@/lib/furniture";
+import { DoorSection } from "@/components/DoorSection";
 
 type Props = {
   params: ShelfParams;
@@ -114,6 +115,9 @@ export function ParamsPanel({ params, onChange }: Props) {
           onCheckedChange={(v) => set("hasBack", v)}
         />
       </div>
+
+      {/* Aperturas — door configuration, reads W/H from current params */}
+      <DoorSection externalDims={{ W: params.width, H: params.height }} />
     </div>
   );
 }

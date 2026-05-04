@@ -14,7 +14,7 @@ export type { ShelfParams, Piece, SheetSize };
 // Block types
 // ---------------------------------------------------------------------------
 
-export type BlockType = 'side-panel' | 'shelf' | 'drawer' | 'back-panel';
+export type BlockType = 'side-panel' | 'shelf' | 'drawer' | 'back-panel' | 'door';
 
 // ---------------------------------------------------------------------------
 // Material types
@@ -95,6 +95,45 @@ export interface BuildingBlock {
   parentId: string | null;
   /** Visual preventive validation status */
   visualValidationStatus: 'ok' | 'warning' | 'error';
+}
+
+// ---------------------------------------------------------------------------
+// Door configuration
+// ---------------------------------------------------------------------------
+
+export type DoorType = 'single' | 'double' | 'none';
+export type DoorSwing = 'left' | 'right';
+export type DoorMount = 'overlay' | 'inset';
+export type HardwareStyle = 'barral' | 'boton' | 'perfil-j';
+export type HardwarePosition = 'top' | 'center' | 'bottom';
+
+export interface DoorConfig {
+  type: DoorType;
+  /** Only relevant when type === 'single' */
+  swing: DoorSwing;
+  mount: DoorMount;
+  hardwareStyle: HardwareStyle;
+  hardwarePosition: HardwarePosition;
+}
+
+export const DEFAULT_DOOR_CONFIG: DoorConfig = {
+  type: 'none',
+  swing: 'left',
+  mount: 'overlay',
+  hardwareStyle: 'barral',
+  hardwarePosition: 'center',
+};
+
+/**
+ * Extended BuildingBlock for door panels.
+ * Carries the pivot side so Viewer3D can animate the correct hinge edge.
+ */
+export interface DoorBlock extends BuildingBlock {
+  isDoor: true;
+  /** Which side the hinge (pivot) is on — determines rotation axis offset */
+  pivotSide: 'left' | 'right';
+  hardwareStyle: HardwareStyle;
+  hardwarePosition: HardwarePosition;
 }
 
 // ---------------------------------------------------------------------------

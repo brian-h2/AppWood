@@ -1,8 +1,9 @@
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows, Grid } from "@react-three/drei";
 import { useState, useEffect, useRef, useMemo } from "react";
+import * as THREE from "three";
 import type { Piece } from "@/lib/furniture";
-import type { BuildingBlock, RoomConfiguration, RoomObstacle } from "@/lib/types";
+import type { BuildingBlock, DoorBlock, RoomConfiguration, RoomObstacle } from "@/lib/types";
 import { VALIDATION_COLORS } from "@/lib/types";
 import type { PresetId } from "@/lib/types";
 import { SCENE_PRESETS } from "@/lib/scene/scenePresets";
@@ -22,6 +23,7 @@ export interface Viewer3DProps {
   height: number;
   // New optional props
   blocks?: BuildingBlock[];
+  doorBlocks?: DoorBlock[];
   presetId?: PresetId | null;
   roomConfig?: RoomConfiguration | null;
   /** Active finish ID — controls colour and PBR properties of all furniture pieces */
@@ -100,8 +102,156 @@ function BlockMesh({ block, finish }: { block: BuildingBlock; finish: Finish }) 
 }
 
 // ---------------------------------------------------------------------------
-// Scene Preset geometry — independent planes with procedural textures
+// Door mesh — pivot-correct hinge animation on click
 // ---------------------------------------------------------------------------
+
+/** Y position of the hardware centre relative to the door centre (in metres) */
+function hardwareOffsetY(Hp: number, position: import('@/lib/types').HardwarePosition): number {
+  if (position === 'top')    return  Hp / 2 - 0.05;
+  if (position === 'bottom') return -Hp / 2 + 0.05;
+  return 0; // center
+}
+
+/** Renders the hardware (tirador) geometry on the door face */
+function HardwareMesh({
+  style,
+  position,
+  Wp,
+  Hp,
+  T,
+  pivotSide,
+}: {
+  style: import('@/lib/types').HardwareStyle;
+  position: import('@/lib/types').HardwarePosition;
+  Wp: number;
+  Hp: number;
+  T: number;
+  pivotSide: 'left' | 'right';
+}) {
+  const yOff = hardwareOffsetY(Hp, position);
+  // Hardware sits on the front face of the door (z = T/2 + small offset)
+  const zOff = T / 2 + 0.008;
+  // X: on the side opposite the hinge (pull side)
+  const xOff = pivotSide === 'left' ? Wp / 2 - 0.04 : -Wp / 2 + 0.04;
+
+  if (style === 'barral') {
+    // Horizontal bar: thin cylinder-like box, 120 mm wide
+    return (
+      <mesh position={[xOff, yOff, zOff]} castShadow>
+        <boxGeometry args={[0.12, 0.012, 0.012]} />
+        <meshStandardMaterial color="#888888" roughness={0.3} metalness={0.8} />
+      </mesh>
+    );
+  }
+
+  if (style === 'boton') {
+    // Round knob: small sphere
+    return (
+      <mesh position={[xOff, yOff, zOff + 0.01]} castShadow>
+        <sphereGeometry args={[0.018, 12, 12]} />
+        <meshStandardMaterial color="#888888" roughness={0.25} metalness={0.85} />
+      </mesh>
+    );
+  }
+
+  // perfil-j: thin vertical strip along the pull edge
+  return (
+    <mesh position={[xOff, yOff, zOff]} castShadow>
+      <boxGeometry args={[0.018, Hp * 0.6, 0.018]} />
+      <meshStandardMaterial color="#666666" roughness={0.2} metalness={0.9} />
+    </mesh>
+  );
+}
+
+/**
+ * Renders a door panel with the pivot (hinge) at the correct lateral edge.
+ *
+ * The hinge pivot group is placed at the back face of the door (the face
+ * touching the cabinet front). The door panel is offset forward by T/2 so
+ * the back face aligns with the group origin. Rotating around Y then makes
+ * the door sweep outward (away from the cabinet — correct carpentry behaviour).
+ *
+ * Click toggles a 90° open/close animation (lerped each frame).
+ */
+function DoorMesh({ door, finish }: { door: DoorBlock; finish: Finish }) {
+  const Wp = door.size.x * MM;
+  const Hp = door.size.y * MM;
+  const T  = door.size.z * MM;
+
+  // Pivot X = hinge (lateral) edge of the door in world space
+  const hingeX = door.pivotSide === 'left'
+    ? (door.position.x - door.size.x / 2) * MM   // left edge
+    : (door.position.x + door.size.x / 2) * MM;  // right edge
+  const pivotY = door.position.y * MM;
+
+  // Pivot Z = back face of the door (the face that rests against the cabinet front).
+  // door.position.z is the CENTRE of the door, so back face = centre - T/2.
+  const pivotZ = door.position.z * MM - T / 2;
+
+  // Mesh offset from pivot:
+  //   X: centre of door relative to hinge edge
+  //   Z: +T/2 so the back face of the door aligns with the pivot origin
+  const meshOffsetX = door.pivotSide === 'left' ? Wp / 2 : -Wp / 2;
+  const meshOffsetZ = T / 2; // push door forward so back face == pivot
+
+  // Animation state
+  const [isOpen, setIsOpen] = useState(false);
+  const currentAngle = useRef(0);
+  // Open direction (Three.js Y-axis rotation, right-hand rule):
+  //   Left-hinged:  mesh centre is at (+Wp/2, 0, +T/2) relative to pivot.
+  //     θ = -90° → z' = +Wp/2  → swings OUTWARD (+Z). ✓
+  //   Right-hinged: mesh centre is at (-Wp/2, 0, +T/2) relative to pivot.
+  //     θ = +90° → z' = +Wp/2  → swings OUTWARD (+Z). ✓
+  const openAngle = door.pivotSide === 'left' ? -Math.PI / 2 : Math.PI / 2;
+  const targetAngle = isOpen ? openAngle : 0;
+  const groupRef = useRef<THREE.Group>(null);
+
+  useFrame((_, delta) => {
+    if (!groupRef.current) return;
+    currentAngle.current = THREE.MathUtils.lerp(
+      currentAngle.current,
+      targetAngle,
+      Math.min(1, delta * 8),
+    );
+    groupRef.current.rotation.y = currentAngle.current;
+  });
+
+  const validationColor = VALIDATION_COLORS[door.visualValidationStatus];
+
+  return (
+    <group ref={groupRef} position={[hingeX, pivotY, pivotZ]}>
+      {/* Door panel — offset so its back face sits at Z=0 (the pivot plane) */}
+      <mesh
+        position={[meshOffsetX, 0, meshOffsetZ]}
+        castShadow
+        receiveShadow
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen((v) => !v);
+        }}
+      >
+        <boxGeometry args={[Wp, Hp, T]} />
+        {validationColor !== null ? (
+          <meshStandardMaterial color={validationColor} roughness={0.65} metalness={0.05} />
+        ) : (
+          <FurnitureMaterial finish={finish} />
+        )}
+      </mesh>
+
+      {/* Hardware (tirador) */}
+      <group position={[meshOffsetX, 0, meshOffsetZ]}>
+        <HardwareMesh
+          style={door.hardwareStyle}
+          position={door.hardwarePosition}
+          Wp={Wp}
+          Hp={Hp}
+          T={T}
+          pivotSide={door.pivotSide}
+        />
+      </group>
+    </group>
+  );
+}
 
 function PresetScene({ presetId }: { presetId: PresetId }) {
   const preset = SCENE_PRESETS[presetId];
@@ -323,15 +473,18 @@ function SceneLighting({ presetId }: { presetId?: PresetId | null }) {
 
 /**
  * Computes the AABB of a set of blocks in mm (local space, origin at 0,0,0).
- * Returns null if blocks array is empty.
+ * Door blocks (type === 'door') are excluded — overlay doors extend in front
+ * of the cabinet and would skew the auto-positioning against the north wall.
+ * Returns null if no non-door blocks exist.
  */
 function computeBlocksAABB(
   blocks: BuildingBlock[],
 ): { minX: number; maxX: number; minZ: number; maxZ: number } | null {
-  if (blocks.length === 0) return null;
+  const structural = blocks.filter((b) => b.type !== 'door');
+  if (structural.length === 0) return null;
   let minX = Infinity, maxX = -Infinity;
   let minZ = Infinity, maxZ = -Infinity;
-  for (const b of blocks) {
+  for (const b of structural) {
     minX = Math.min(minX, b.position.x - b.size.x / 2);
     maxX = Math.max(maxX, b.position.x + b.size.x / 2);
     minZ = Math.min(minZ, b.position.z - b.size.z / 2);
@@ -391,6 +544,7 @@ export function Viewer3D({
   pieces,
   height,
   blocks,
+  doorBlocks,
   presetId,
   roomConfig,
   finishId,
@@ -440,6 +594,10 @@ export function Viewer3D({
           {pieces.map((p) => (
             <PieceMesh key={p.id} piece={p} finish={finish} />
           ))}
+          {/* Parametric mode door panels — rendered at the same Y offset as pieces */}
+          {(!blocks || blocks.length === 0) && doorBlocks && doorBlocks.map((door) => (
+            <DoorMesh key={door.id} door={door} finish={finish} />
+          ))}
         </group>
 
         {/* Building Blocks — auto-positioned against north wall, centred on X */}
@@ -447,6 +605,10 @@ export function Viewer3D({
           <group position={groupOffset}>
             {blocks.map((block) => (
               <BlockMesh key={block.id} block={block} finish={finish} />
+            ))}
+            {/* Door panels — rendered inside the same group so they share the offset */}
+            {doorBlocks && doorBlocks.map((door) => (
+              <DoorMesh key={door.id} door={door} finish={finish} />
             ))}
           </group>
         )}

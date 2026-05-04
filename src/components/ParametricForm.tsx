@@ -5,6 +5,7 @@ import type { TemplateDimensions } from '@/lib/templates/registry';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { DoorSection } from '@/components/DoorSection';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -87,6 +88,9 @@ export function ParametricForm({ onDimensionsChange }: ParametricFormProps): JSX
           </div>
         ))}
       </div>
+
+      {/* Aperturas (doors) */}
+      <DoorSection />
     </div>
   );
 }
